@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.9;
+
+contract DecentralizedLendingPlatform {
+    
+    // Struct to hold project details
+    struct Loan {
+        address lender;
+        address borrower;
+        uint256 amount;
+        uint256 interestRate;
+        uint256 duration; // in days
+        uint256 repayDate;
+        bool isRepaid;
+    }
+
+    // Mapping to store all loans
+    mapping(uint256 => Loan) public loans;
+    uint256 public loanCounter;
+
+    // Event to notify when a loan is created
+    event LoanCreated(
+        uint256 loanId,
+        address indexed lender,
+        address indexed borrower,
+        uint256 amount,
+        uint256 interestRate,
+        uint256 duration
+    );
+
+    // Event to notify when a loan is repaid
+    event LoanRepaid(uint256 loanId, address indexed borrower);
+
+    // Function to create a loan
+    function createLoan(address _borrower, uint256 _amount, uint256 _interestRate, uint256 _duration) public {
+        loanCounter++;
+
+        loans[loanCounter] = Loan({
+            lender: msg.sender,
+            borrower: _borrower,
+            amount: _amount,
+            interestRate: _interestRate,
+            duration: _duration,
+            repayDate: block.timestamp + (_duration * 1 days),
+            isRepaid: false
+        });
+
+        emit LoanCreated(loanCounter, msg.sender, _borrower, _amount, _interestRate, _duration);
+    }
+
+    // Function for the borrower to repay the loan
+    function repayLoan(uint256 _loanId) public payable {
+        Loan storage loan = loans[_loanId];
+        
+        require(msg.sender == loan.borrower, "Only the borrower can repay the loan");
+        require(loan.isRepaid == false, "Loan already repaid");
+        require(block.timestamp <= loan.repayDate, "Loan repayment period has expired");
+
+        uint256 totalRepaymentAmount = loan.amount + (loan.amount * loan.interestRate) / 100;
+        
+        require(msg.value >= totalRepaymentAmount, "Insufficient funds to repay the loan");
+
+        // Transfer the loan amount to the lender
+        payable(loan.lender).transfer(loan.amount);
+        loan.isRepaid = true;
+
+        // Emit repayment event
+        emit LoanRepaid(_loanId, msg.sender);
+    }
+
+    // Function to get loan details
+    function getLoanDetails(uint256 _loanId) public view returns (
+        address lender, 
+        address borrower, 
+        uint256 amount, 
+        uint256 interestRate, 
+        uint256 duration, 
+        uint256 repayDate, 
+        bool isRepaid
+    ) {
+        Loan storage loan = loans[_loanId];
+        return (
+            loan.lender,
+            loan.borrower,
+            loan.amount,
+            loan.interestRate,
+            loan.duration,
+            loan.repayDate,
+            loan.isRepaid
+        );
+    }
+}
